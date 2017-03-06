@@ -27,10 +27,10 @@ if (typeof window !== 'object') return;
 if(document.querySelectorAll === void 0 || window.pageYOffset === void 0 || history.pushState === void 0) { return; }
 
 // Get the top position of an element in the document
-var getTop = function(element, start) {
+var getEnd = function(element, start, direction) {
     // return value of html.getBoundingClientRect().top ... IE : 0, other browsers : -pageYOffset
     if(element.nodeName === 'HTML') return -start
-    return element.getBoundingClientRect().top + start
+    return element.getBoundingClientRect()[direction === 'vertical' ? 'top' : 'left'] + start
 }
 // ease in out function thanks to:
 // http://blog.greweb.fr/2012/02/bezier-curve-based-easing-functions-from-concept-to-implementation/
@@ -40,7 +40,7 @@ var easeInOutCubic = function (t) { return t<.5 ? 4*t*t*t : (t-1)*(2*t-2)*(2*t-2
 // given the start and end point of the scroll
 // the time elapsed from the beginning of the scroll
 // and the total duration of the scroll (default 500ms)
-var position = function(start, end, elapsed, duration) {
+var getPosition = function(start, end, elapsed, duration) {
     if (elapsed > duration) return end;
     return start + (end - start) * easeInOutCubic(elapsed / duration); // <-- you can change the easing funtion there
     // return start + (end - start) * (elapsed / duration); // <-- this would give a linear scroll
@@ -51,15 +51,20 @@ var position = function(start, end, elapsed, duration) {
 // if the first argument is numeric then scroll to this location
 // if the callback exist, it is called when the scrolling is finished
 // if context is set then scroll that element, else scroll window
-var smoothScroll = function(el, duration, callback, context){
+// if direction is horizontal then set it, else set vertical
+var smoothScroll = function(el, duration, callback, context, direction){
     duration = duration || 500;
     context = context || window;
-    var start = context.scrollTop || window.pageYOffset;
+    direction = direction === 'horizontal' ? direction : 'vertical';
+    var start = direction === 'vertical' ?
+        (context.scrollTop || window.pageYOffset)
+        :
+        (context.scrollLeft || window.pageXOffset);
 
     if (typeof el === 'number') {
       var end = parseInt(el);
     } else {
-      var end = getTop(el, start);
+      var end = getEnd(el, start, direction);
     }
 
     var clock = Date.now();
@@ -69,11 +74,20 @@ var smoothScroll = function(el, duration, callback, context){
 
     var step = function(){
         var elapsed = Date.now() - clock;
+        var position = getPosition(start, end, elapsed, duration);
         if (context !== window) {
-          context.scrollTop = position(start, end, elapsed, duration);
+          if (direction === 'vertical') {
+            context.scrollTop = position;
+          } else {
+            context.scrollLeft = position;
+          }
         }
         else {
-          window.scroll(0, position(start, end, elapsed, duration));
+          if (direction === 'vertical') {
+            window.scroll(window.scrollX, position);
+          } else {
+            window.scroll(position, window.scrollY)
+          }
         }
 
         if (elapsed > duration) {
